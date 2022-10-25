@@ -1,29 +1,34 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <form action="../../post" method="post" 
-              className="form">
-          <button type="submit">Connected?</button>
-        </form>
-      </header>
-    </div>
-  );
+    const [value, setValue] = useState('');
+    
+    const [open, setOpen]= useState(false)
+
+    function handleSubmit(event) {
+      const formData = new FormData(event.currentTarget);
+      console.log(formData.get('id'));
+
+      setOpen(true);
+    }
+
+    if (open) {
+        return <ReactQuill theme="snow" value={value} onChange={setValue} />;
+
+    }else{
+        return (
+          <form onSubmit={handleSubmit} >
+              <label>
+                  Document Id:
+                  <input type="text" name="id" />
+              </label>
+              <br/>
+              <input type="submit" value="Open"/>
+          </form>
+        )
+    }
 }
 
 export default App;

@@ -23,7 +23,6 @@ exports.CRDT = class {
   }
 
   update(update: string) {
-    // ...
     console.log(update);
     let update = this.toHTML().replace('<p>', '').replace('</p>', '');
     this.cb(update, false);
