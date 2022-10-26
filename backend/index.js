@@ -62,7 +62,7 @@ app.post('/api/op/:id', (req, res) => {
     let docId = req.params.id;
     let body = req.body;
     
-    docs[docId].updates.push(body.update.ops)
+    docs[docId].updates.push(body.update)
     console.log(docs[docId].updates)
 
     sendUpdates(docId, body, body.id);
@@ -76,7 +76,7 @@ app.post('/api/op/:id', (req, res) => {
 function sendUpdates(docId, body, userId) {
     docs[docId].clients.forEach(client => {
         const {id, update} = body
-        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: body.update.ops, id: id})}\nevent:update\n\n`)
+        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: body.update, id: id})}\nevent:update\n\n`)
     });
 }
 

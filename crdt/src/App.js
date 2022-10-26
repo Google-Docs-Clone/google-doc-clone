@@ -71,7 +71,7 @@ function App() {
             }
 			let payload = {
 				id: ydoc.clientID,
-				update: delta
+				update: delta.ops
 			}
 			console.log(payload)
 			api.post(`/op/${id}`, payload).then((response) => {
