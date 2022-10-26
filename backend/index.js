@@ -21,12 +21,12 @@ app.get('/api/connect/:id', (req, res) => {
     let docId = req.params.id;
 
     if (docs.hasOwnProperty(docId)){ // is running docId
-        res.write(`id:${docId}\ndata:${JSON.stringify(docs[docId].updates)}\nevent:sync\n\n`);
-        
         const newClient = {
             id: docId + docs[docId].num + '',
             res: res
         }
+
+        res.write(`id:${docId}\ndata:${JSON.stringify(docs[docId].updates)}\nevent:sync\n\n`);
 
         docs[docId].num++;
 
@@ -62,10 +62,10 @@ app.post('/api/op/:id', (req, res) => {
     let docId = req.params.id;
     let body = req.body;
     
-    
-    docs[docId].updates.push(body.update)
+    docs[docId].updates.push(body.update.ops)
+    console.log(docs[docId].updates)
 
-    sendUpdates(docId, body);
+    sendUpdates(docId, body, body.id);
 
     res.json({
         status: 200
@@ -73,13 +73,10 @@ app.post('/api/op/:id', (req, res) => {
 
 })
 
-function sendUpdates(docId, body) {
+function sendUpdates(docId, body, userId) {
     docs[docId].clients.forEach(client => {
-        if (client.id === body.id) {
-            return
-        }
         const {id, update} = body
-        client.res.write(`id:${docId}\ndata:${JSON.stringify(body.update)}\nevent:update\n\n`)
+        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: body.update.ops, id: id})}\nevent:update\n\n`)
     });
 }
 
