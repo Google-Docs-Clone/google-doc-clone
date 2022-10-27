@@ -1,10 +1,20 @@
+const ylb = require("y-leveldb")
+const Y = require('yjs')
+const base64 = require('js-base64')
+
 var express = require('express');
 var app = express();
 var http = require('http');
 var server = http.createServer(app);
+const persistence = new ylb.LeveldbPersistence('./storage')
 
 const cors = require('cors');
 app.use(cors());
+app.use(express.static('build', {
+    setHeaders: function(res, path) {
+      res.set("X-CSE356", "6339f8feca6faf39d6089077");
+    }
+}));
 
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());
@@ -21,34 +31,33 @@ app.get('/api/connect/:id', (req, res) => {
     let docId = req.params.id;
 
     if (docs.hasOwnProperty(docId)){ // is running docId
+        let length = docs[docId].clients.length + 1;
         const newClient = {
-            id: docId + docs[docId].num + '',
+            id: docId + '-' + length,
             res: res
         }
-
-        res.write(`id:${docId}\ndata:${JSON.stringify(docs[docId].updates)}\nevent:sync\n\n`);
-
-        docs[docId].num++;
-
+        persistence.getYDoc(docId).then((ydoc) => {
+            res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(Y.encodeStateAsUpdate(ydoc))})}\nevent:sync\n\n`);
+        })
+        
         docs[docId].clients.push(newClient);
-
     }else{
+        docs[docId] = {
+            clients: [],
+        }
+        let length = docs[docId].clients.length + 1;
         const newClient = {
-            id: docId + '1',
+            id: docId + length,
             res: res
         }
 
-        res.write(`id:${docId}\ndata:${JSON.stringify([])}\nevent:sync\n\n`);
+        docs[docId].clients.push(newClient)
 
-        docs[docId] = {
-            clients: [newClient],
-            num: 2,
-            updates: []
-        }
-
+        res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(new Uint8Array([0, 0]))})}\nevent:sync\n\n`);
+        
         req.on('close', () => {
             docs[docId].clients = docs[docId].clients.filter(client => client.id !== newClient.id);
-            docs[docId].num--;
+            res.end()
         })
     }
 
@@ -58,14 +67,19 @@ app.post('/api/op/:id', (req, res) => {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('X-CSE356', '6339f8feca6faf39d6089077');
+
     
     let docId = req.params.id;
     let body = req.body;
     
-    docs[docId].updates.push(body.update)
-    console.log(docs[docId].updates)
+    const update = base64.toUint8Array(body.update)
 
-    sendUpdates(docId, body, body.id);
+    const ydoc = persistence.getYDoc(docId).then((ydoc) => {
+        const updateDiff = Y.diffUpdate(update, Y.encodeStateAsUpdate(ydoc));
+        persistence.storeUpdate(docId, updateDiff)
+    })
+
+    sendUpdates(docId, body.update, body.id);
 
     res.json({
         status: 200
@@ -73,10 +87,9 @@ app.post('/api/op/:id', (req, res) => {
 
 })
 
-function sendUpdates(docId, body, userId) {
+function sendUpdates(docId, stateUpdate, id) {
     docs[docId].clients.forEach(client => {
-        const {id, update} = body
-        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: body.update, id: id})}\nevent:update\n\n`)
+        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: stateUpdate, id: id})}\nevent:update\n\n`)
     });
 }
 

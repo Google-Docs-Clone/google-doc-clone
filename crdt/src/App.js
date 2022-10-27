@@ -5,6 +5,7 @@ import Quill from 'quill'
 import QuillCursors from 'quill-cursors'
 import 'quill/dist/quill.snow.css'
 import axios from 'axios'
+import { fromUint8Array, toUint8Array } from 'js-base64'
 
 
 function App() {
@@ -24,7 +25,7 @@ function App() {
 
 	const wrapperRef = useCallback((wrapper) => {
 		const api = axios.create({
-			baseURL: 'http://localhost:4000/api',
+			baseURL: 'http://209.94.59.0:4000/api',
 		})
 
 		if (wrapper == null) return;
@@ -52,16 +53,22 @@ function App() {
 		const binding = new QuillBinding(ytext, editor)
 		
 		
-		var eventSource = new EventSource(`http://localhost:4000/api/connect/${id}`)
+		var eventSource = new EventSource(`http://209.94.59.0:4000/api/connect/${id}`)
 
 		eventSource.addEventListener('sync', (e) => {
-			let deltaArray = JSON.parse(e.data)
-			deltaArray.forEach(delta => ytext.applyDelta(delta))
+			let data = JSON.parse(e.data)
+			if (data.updates === undefined || data.updates.length === 0) {
+				return
+			}
+			console.log(data.updates)
+			console.log(toUint8Array(data.updates))
+			Y.applyUpdate(ydoc, toUint8Array(data.updates))
+			console.log('done')
 		});
 		eventSource.addEventListener('update', (e) => {
 			let data = JSON.parse(e.data)
 			if (data.id !== ydoc.clientID){
-				ytext.applyDelta(data.updates)
+				Y.applyUpdate(ydoc, toUint8Array(data.updates))
 			}
 		});
 
@@ -71,17 +78,13 @@ function App() {
             }
 			let payload = {
 				id: ydoc.clientID,
-				update: delta.ops
+				update: fromUint8Array(Y.encodeStateAsUpdate(ydoc))
 			}
 			console.log(payload)
 			api.post(`/op/${id}`, payload).then((response) => {
 				console.log(response)
 			})
 		})
-
-		// return () => {
-		// 	wrapperRef.innerHTML = ''
-		// }
 	},
 	[id],
 	)
