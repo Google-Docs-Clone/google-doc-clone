@@ -1,6 +1,7 @@
 // ... add imports and fill in the code
 import * as Y from 'yjs'
 var QuillDeltaToHtmlConverter = require('quill-delta-to-html').QuillDeltaToHtmlConverter;
+import { fromUint8Array, toUint8Array } from 'js-base64';
 
 
 class CRDTFormat {
@@ -13,50 +14,59 @@ exports.CRDT = class {
   
 	ydoc: any;
 	cb: any;
+	ytext: any;
 
 	constructor(cb: (update: string, isLocal: Boolean) => void) {
 		this.ydoc = new Y.Doc();
 		this.cb = cb;
+		this.ytext = this.ydoc.getText('test');
 		['update', 'insert', 'delete', 'toHTML'].forEach(f => (this as any)[f] = (this as any)[f].bind(this));
 	}
 
 	update(update: string) {
 		console.log(update);
-		const ytext = this.ydoc.getText('test');
 		let data = JSON.parse(update)
-		if (data.id !== this.ydoc.clientID){
-			ytext.applyDelta(data.update)
+		if (data === undefined || data.length == 0 || data == null) {
+			return
 		}
+
+		if (data.id !== this.ydoc.clientID){
+			Y.applyUpdate(this.ydoc, toUint8Array(data.updates))
+		}
+
 		this.cb(update, false);
 	}
 
 	insert(index: number, content: string, format: CRDTFormat) {
-		const ytext = this.ydoc.getText('test');
-		ytext.insert(index, content, format);
-		let delta = ytext.toDelta().at(-1)
+		this.ytext.insert(index, content, format);
+		const stateUpdate = Y.encodeStateAsUpdate(this.ydoc)
 		let update = JSON.stringify({
-			id: ytext.clientID,
-			update: [delta]
+			id: this.ydoc.clientID,
+			update: fromUint8Array(stateUpdate),
 		})
 		this.cb(update, true)
 	}
 
 	delete(index: number, length: number) {
-		const ytext = this.ydoc.getText('test');
-		ytext.delete(index, length);
-		let delta = ytext.toDelta().at(-1)
+		this.ytext.delete(index, length);
+		const stateUpdate = Y.encodeStateAsUpdate(this.ydoc)
 		let update = JSON.stringify({
-			id: ytext.clientID,
-			update: [delta]
+			id: this.ydoc.clientID,
+			update: fromUint8Array(stateUpdate),
 		})
 		this.cb(update, true);
 	}
 
 	toHTML() {
-		const ytext = this.ydoc.getText('test');
 		let cfg = {};
-		let converter = new QuillDeltaToHtmlConverter(ytext.toDelta(), cfg);
+		let converter = new QuillDeltaToHtmlConverter(this.ytext.toDelta(), cfg);
 		let html = converter.convert(); 
+
+		// let payload = JSON.stringify({
+		// 	html: html,
+		// 	id: this.ydoc.clientID,
+		// })
+		// this.cb(payload, true);
 		return html;
 	}
 };

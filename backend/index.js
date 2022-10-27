@@ -37,13 +37,15 @@ app.get('/api/connect/:id', (req, res) => {
             res: res
         }
         persistence.getYDoc(docId).then((ydoc) => {
-            res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(Y.encodeStateAsUpdate(ydoc))})}\nevent:sync\n\n`);
+            res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(Y.encodeStateAsUpdate(ydoc)), id: -1})}\nevent:sync\n\n`);
         })
-        
+        //res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(Y.encodeStateAsUpdate(docs[docId].doc)), id: -1})}\nevent:sync\n\n`);
         docs[docId].clients.push(newClient);
     }else{
         docs[docId] = {
             clients: [],
+            modified: false,
+            //doc: new Y.Doc()
         }
         let length = docs[docId].clients.length + 1;
         const newClient = {
@@ -53,7 +55,7 @@ app.get('/api/connect/:id', (req, res) => {
 
         docs[docId].clients.push(newClient)
 
-        res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(new Uint8Array([0, 0]))})}\nevent:sync\n\n`);
+        res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(new Uint8Array([0,0])), id: -1})}\nevent:sync\n\n`);
         
         req.on('close', () => {
             docs[docId].clients = docs[docId].clients.filter(client => client.id !== newClient.id);
@@ -72,12 +74,10 @@ app.post('/api/op/:id', (req, res) => {
     let docId = req.params.id;
     let body = req.body;
     
-    const update = base64.toUint8Array(body.update)
+    const update = base64.toUint8Array(body.update) // update is state update
 
-    const ydoc = persistence.getYDoc(docId).then((ydoc) => {
-        const updateDiff = Y.diffUpdate(update, Y.encodeStateAsUpdate(ydoc));
-        persistence.storeUpdate(docId, updateDiff)
-    })
+    persistence.storeUpdate(docId, update)
+    //Y.applyUpdate(docs[docId].doc, update)
 
     sendUpdates(docId, body.update, body.id);
 
