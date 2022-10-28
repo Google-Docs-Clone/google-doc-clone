@@ -5,7 +5,7 @@ import Quill from 'quill'
 import QuillCursors from 'quill-cursors'
 import 'quill/dist/quill.snow.css'
 import axios from 'axios'
-import { fromUint8Array, toUint8Array } from 'js-base64'
+import * as base64 from "byte-base64";
 
 
 function App() {
@@ -60,30 +60,32 @@ function App() {
 			if (data.updates === undefined || data.updates.length === 0) {
 				return
 			}
-			console.log(data.updates)
-			console.log(toUint8Array(data.updates))
-			Y.applyUpdate(ydoc, toUint8Array(data.updates))
-			console.log('done')
+			//console.log(data.updates)
+			//console.log(toUint8Array(data.updates))
+			Y.applyUpdate(ydoc, base64.base64ToBytes(data.updates))
+			//console.log('done')
 		});
 		eventSource.addEventListener('update', (e) => {
 			let data = JSON.parse(e.data)
+			console.log(data)
+			console.log(Uint8Array.from(data.updates))
 			if (data.id !== ydoc.clientID){
-				Y.applyUpdate(ydoc, toUint8Array(data.updates))
+				Y.applyUpdate(ydoc, base64.base64ToBytes(data.updates))
 			}
 		});
 
-		editor.on('text-change', function(delta, oldContents, source) {
-			if(source !== "user") {
-                return
-            }
-			let payload = {
-				id: ydoc.clientID,
-				update: fromUint8Array(Y.encodeStateAsUpdate(ydoc))
+		ydoc.on('update', (update, origin, doc) => {
+			if(origin === binding) {
+				let payload = ({
+					id: ydoc.clientID,
+					update: base64.bytesToBase64(update)
+				})
+				
+				console.log(JSON.stringify(payload).length)
+				api.post(`/op/${id}`, payload).then((response) => {
+					//console.log(response)
+				})
 			}
-			console.log(payload)
-			api.post(`/op/${id}`, payload).then((response) => {
-				console.log(response)
-			})
 		})
 	},
 	[id],
@@ -96,9 +98,10 @@ function App() {
 			<form onSubmit={handleSubmit} >
 					<label>
 						Document Id:
+						<br/>
 						<input type="text" name="id" />
 					</label>
-					<br/>
+					
 					<input type="submit" value="Open"/>
 				</form>
 		);

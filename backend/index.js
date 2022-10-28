@@ -1,6 +1,6 @@
 const ylb = require("y-leveldb")
 const Y = require('yjs')
-const base64 = require('js-base64')
+const base64 = require('byte-base64')
 
 var express = require('express');
 var app = express();
@@ -36,16 +36,16 @@ app.get('/api/connect/:id', (req, res) => {
             id: docId + '-' + length,
             res: res
         }
-        persistence.getYDoc(docId).then((ydoc) => {
-            res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(Y.encodeStateAsUpdate(ydoc)), id: -1})}\nevent:sync\n\n`);
-        })
-        //res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(Y.encodeStateAsUpdate(docs[docId].doc)), id: -1})}\nevent:sync\n\n`);
+        // persistence.getYDoc(docId).then((ydoc) => {
+        //     res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.bytesToBase64(Y.encodeStateAsUpdate(ydoc)), id: -1})}\nevent:sync\n\n`);
+        // })
+        res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.bytesToBase64(Y.encodeStateAsUpdate(docs[docId].doc)), id: -1})}\nevent:sync\n\n`);
         docs[docId].clients.push(newClient);
     }else{
         docs[docId] = {
             clients: [],
             modified: false,
-            //doc: new Y.Doc()
+            doc: new Y.Doc()
         }
         let length = docs[docId].clients.length + 1;
         const newClient = {
@@ -55,7 +55,7 @@ app.get('/api/connect/:id', (req, res) => {
 
         docs[docId].clients.push(newClient)
 
-        res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.fromUint8Array(new Uint8Array([0,0])), id: -1})}\nevent:sync\n\n`);
+        res.write(`id:${docId}\ndata:${JSON.stringify({updates: base64.bytesToBase64(new Uint8Array([0,0])), id: -1})}\nevent:sync\n\n`);
         
         req.on('close', () => {
             docs[docId].clients = docs[docId].clients.filter(client => client.id !== newClient.id);
@@ -73,25 +73,25 @@ app.post('/api/op/:id', (req, res) => {
     
     let docId = req.params.id;
     let body = req.body;
+
+    //console.log(body)
     
-    const update = base64.toUint8Array(body.update) // update is state update
+    const update = base64.base64ToBytes(body.update) // update is state update
 
-    persistence.storeUpdate(docId, update)
-    //Y.applyUpdate(docs[docId].doc, update)
+    //persistence.storeUpdate(docId, update)
+    Y.applyUpdate(docs[docId].doc, update)
 
-    sendUpdates(docId, body.update, body.id);
+    docs[docId].clients.forEach(client => {
+        //console.log('client write')
+        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: body.update, id: body.id})}\nevent:update\n\n`)
+    });
 
     res.json({
         status: 200
     })
+    console.log(docs[docId].clients.length)
 
 })
-
-function sendUpdates(docId, stateUpdate, id) {
-    docs[docId].clients.forEach(client => {
-        client.res.write(`id:${docId}\ndata:${JSON.stringify({updates: stateUpdate, id: id})}\nevent:update\n\n`)
-    });
-}
 
 
 server.listen(4000, function(){

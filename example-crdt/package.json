@@ -29,7 +29,7 @@
     "webpack-obfuscator": "^3.5.1"
   },
   "dependencies": {
-    "js-base64": "^3.7.2",
+    "byte-base64": "^1.1.0",
     "quill-delta-to-html": "^0.12.1",
     "y-websocket": "^1.4.5",
     "yjs": "^13.5.42"
