@@ -1,14 +1,28 @@
-const ylb = require("y-leveldb")
-const Y = require('yjs')
+var express = require('express');
+var http = require('http');
+const cors = require('cors');
+
+
 const base64 = require('byte-base64')
 
-var express = require('express');
+const session = require('express-session')
+const mongoDBSession = require('connect-mongodb-session')(session)
+const store = new mongoDBSession({
+    uri: process.env.DB_CONNECT,
+    collection: 'sessions'
+})
+
+const cookieParser = require('cookie-parser')
+
 var app = express();
-var http = require('http');
 var server = http.createServer(app);
 const persistence = new ylb.LeveldbPersistence('./storage')
 
-const cors = require('cors');
+
+
+const db = require('./db')
+db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+
 app.use(cors());
 app.use(express.static('build', {
     setHeaders: function(res, path) {
@@ -18,6 +32,20 @@ app.use(express.static('build', {
 
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());
+
+app.use(cookieParser())
+
+app.use(
+    session({
+        secret: "session key",
+        resave: false,
+        store: store,
+        saveUninitialized: false
+    })
+)
+
+const controller = require('./routes/index')
+app.use('/', controller)
 
 var docs = {}
 
