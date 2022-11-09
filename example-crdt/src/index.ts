@@ -50,35 +50,17 @@ exports.CRDT = class {
 	insert(index: number, content: string, format: CRDTFormat) {
 		this.isLocal = true;
 		this.ytext.insert(index, content, format);
-		//const stateUpdate = Y.encodeStateAsUpdate(this.ydoc);
-		// let update = JSON.stringify({
-		// 	id: this.ydoc.clientID,
-		// 	update: fromUint8Array(stateUpdate),
-		// })
-		//this.cb(update, true)
 	}
 
 	delete(index: number, length: number) {
 		this.isLocal = true;
 		this.ytext.delete(index, length);
-		//const stateUpdate = Y.encodeStateAsUpdate(this.ydoc);
-		// let update = JSON.stringify({
-		// 	id: this.ydoc.clientID,
-		// 	update: fromUint8Array(stateUpdate),
-		// })
-		//this.cb(update, true);
 	}
 
 	toHTML() {
 		let cfg = {};
 		let converter = new QuillDeltaToHtmlConverter(this.ytext.toDelta(), cfg);
 		let html = converter.convert(); 
-
-		// let payload = JSON.stringify({
-		// 	html: html,
-		// 	id: this.ydoc.clientID,
-		// })
-		// this.cb(payload, true);
 		return html;
 	}
 };
