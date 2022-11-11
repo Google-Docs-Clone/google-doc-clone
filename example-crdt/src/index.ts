@@ -1,8 +1,6 @@
 // ... add imports and fill in the code
 import * as Y from 'yjs'
 var QuillDeltaToHtmlConverter = require('quill-delta-to-html').QuillDeltaToHtmlConverter;
-import * as base64 from "byte-base64"
-
 
 class CRDTFormat {
   public bold?: Boolean = false;
@@ -24,8 +22,7 @@ exports.CRDT = class {
 		this.isLocal = false;
 		this.ydoc.on('update', (update: Uint8Array) => {
 			let updateJSON = JSON.stringify({
-				id: this.ydoc.clientID,
-				update: base64.bytesToBase64(update),
+				update: Array.from(update),
 			})
 			this.cb(updateJSON, this.isLocal );
 		});
@@ -33,7 +30,6 @@ exports.CRDT = class {
 	}
 
 	update(update: string) {
-		//console.log(update);
 		this.isLocal = false;
 		let data = JSON.parse(update);
 		if (data === undefined || data.length == 0 || data == null) {
@@ -41,7 +37,7 @@ exports.CRDT = class {
 		}
 
 		if (data.id !== this.ydoc.clientID){
-			Y.applyUpdate(this.ydoc, base64.base64ToBytes(data.updates));
+			Y.applyUpdate(this.ydoc, new Uint8Array(data.updates) );
 		}
 
 		//this.cb(update, false);
@@ -55,6 +51,11 @@ exports.CRDT = class {
 	delete(index: number, length: number) {
 		this.isLocal = true;
 		this.ytext.delete(index, length);
+	}
+
+	insertImage(index: number, url: string) {
+		this.isLocal = true;
+		this.ytext.appleDelta([{retain: index}, {insert: {image : url}}])
 	}
 
 	toHTML() {

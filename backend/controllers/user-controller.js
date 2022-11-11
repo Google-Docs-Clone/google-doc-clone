@@ -8,7 +8,7 @@ sendEmail = async (email, key, host, res) => {
     let commands = ['-c', "echo " + '\"' + link + "\"" + " | mail --encoding=quoted-printable -s \"verify\" " + email] 
     let child = exec('sh', commands)
 
-    console.log('email sent')
+    //console.log('email sent')
     return res
         .status(200)
         .json({
@@ -19,6 +19,7 @@ sendEmail = async (email, key, host, res) => {
 login = async (req, res) => {
     res.setHeader('X-CSE356', '6306cc6d58d8bb3ef7f6b85b');
     const {email, password} = req.body
+    //console.log(req.body)
 
     if (!email || !password){
         return res
@@ -58,19 +59,22 @@ login = async (req, res) => {
     }
 
     req.session.user = email
+    req.session.name = user.name
+    req.session.token = crypto.generateKeySync('hmac', { length: 128 }).export().toString('hex')
     return res
         .status(200)
         .json({
             status: 'login',
-            name: match.name
+            name: user.name
         })
 
 }
 
 signup = async (req, res) => {
-    const {username, password, email} = req.body;
+    const {name, password, email} = req.body;
+    console.log(req.body)
     res.setHeader('X-CSE356', '6306cc6d58d8bb3ef7f6b85b');
-    if (!username || !password || !email) {
+    if (!name || !password || !email) {
         return res
             .status(200)
             .json({
@@ -80,9 +84,10 @@ signup = async (req, res) => {
     }
 
     const existingEmail = await User.findOne({ email: email });
-    const existingUser = await User.findOne({ username: username });
+    console.log(existingEmail)
+    const existingUser = await User.findOne({ name: name });
+    console.log(existingUser)
     if (existingEmail || existingUser) {
-        console.log('exist user')
         return res
             .status(200)
             .json({
@@ -99,7 +104,7 @@ signup = async (req, res) => {
 
     const newUser = new User({
         email: email,
-        name: username,
+        name: name,
         password: passwordHash,
         verified: false,
         key: key
@@ -118,7 +123,7 @@ verify = async (req, res) => {
     const user = await User.findOne({ email: email });
 
     if (key !== user.key){
-        console.log('not same key')
+        //console.log('not same key')
         return res
             .status(200)
             .json({
@@ -128,7 +133,7 @@ verify = async (req, res) => {
     }
     user.verified = true
     await user.save()
-    console.log('wait')
+    //console.log('wait')
     return res
         .status(200)
         .json({
@@ -137,6 +142,7 @@ verify = async (req, res) => {
 }
 
 signout = (req, res) => {
+    //console.log(req.session)
     console.log('logout')
     res.setHeader('X-CSE356', '6306cc6d58d8bb3ef7f6b85b');
     req.session.destroy()
@@ -147,3 +153,9 @@ signout = (req, res) => {
         }))
 }
 
+module.exports = {
+    login,
+    signout,
+    verify,
+    signup
+}
