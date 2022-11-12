@@ -8,7 +8,9 @@ const upload = multer({ dest: 'media/' })
 
 const auth = (req, res, next) => {
     res.setHeader('X-CSE356', '6306cc6d58d8bb3ef7f6b85b');
+    //console.log(req)
     //console.log(req.session)
+    //console.log(req.session.id)
     if (req.session.user){
         next()
     }else{
@@ -22,7 +24,7 @@ const auth = (req, res, next) => {
 }
 router.post('/users/login', UserController.login)
 router.post('/users/signup', UserController.signup)
-router.post('/users/signout', auth, UserController.signout)
+router.post('/users/signout', UserController.signout)
 router.get('/users/verify', UserController.verify)
 
 router.post('/collection/create', auth,  DocumentController.createDocument)

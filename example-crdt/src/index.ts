@@ -18,7 +18,7 @@ exports.CRDT = class {
 	constructor(cb: (update: string, isLocal: Boolean) => void) {
 		this.ydoc = new Y.Doc();
 		this.cb = cb;
-		this.ytext = this.ydoc.getText('test');
+		this.ytext = this.ydoc.getText('quill');
 		this.isLocal = false;
 		this.ydoc.on('update', (update: Uint8Array) => {
 			let updateJSON = JSON.stringify({
@@ -36,11 +36,7 @@ exports.CRDT = class {
 			return;
 		}
 
-		if (data.id !== this.ydoc.clientID){
-			Y.applyUpdate(this.ydoc, new Uint8Array(data.updates) );
-		}
-
-		//this.cb(update, false);
+		Y.applyUpdate(this.ydoc, new Uint8Array(data.update) );
 	}
 
 	insert(index: number, content: string, format: CRDTFormat) {
@@ -55,7 +51,7 @@ exports.CRDT = class {
 
 	insertImage(index: number, url: string) {
 		this.isLocal = true;
-		this.ytext.appleDelta([{retain: index}, {insert: {image : url}}])
+		this.ytext.applyDelta([{retain: index}, {insert: {image : url}}])	
 	}
 
 	toHTML() {

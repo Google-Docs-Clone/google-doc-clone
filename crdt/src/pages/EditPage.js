@@ -12,21 +12,22 @@ export default function EditPage() {
     Quill.register('modules/cursors', QuillCursors)
 
 	let url = window.location.href.split('/').filter(n => n)
-	console.log(url)
+	//console.log(url)
 	let id = url[url.length-1]
 
 
 	const wrapperRef = useCallback((wrapper) => {
 		const api = axios.create({
-			baseURL: 'http://localhost:4000/api',
+			baseURL: 'http://nix.cse356.compas.cs.stonybrook.edu/api',
 			withCredentials: true 
 		})
 
 		if (wrapper == null) return;
 		wrapper.innerHTML = '';
+		var QuillDeltaToHtmlConverter = require('quill-delta-to-html').QuillDeltaToHtmlConverter;
 
 		const ydoc = new Y.Doc()
-		const ytext = ydoc.getText(id)
+		const ytext = ydoc.getText('quill')
 		const editorContainer = document.createElement('div')
 		wrapper.append(editorContainer);
 
@@ -52,22 +53,23 @@ export default function EditPage() {
 		
 		const binding = new QuillBinding(ytext, editor)
 		
-		
-		var eventSource = new EventSource(`http://localhost:4000/api/connect/${id}`, { withCredentials: true })
+		var eventSource = new EventSource(`http://nix.cse356.compas.cs.stonybrook.edu/api/connect/${id}`, { withCredentials: true })
+		console.log(eventSource)
 
 		eventSource.addEventListener('sync', (e) => {
 			let data = JSON.parse(e.data)
-			console.log(data)
+			//console.log(data)
 			if (data.update === undefined || data.update.length === 0) {
 				return
 			}
 			Y.applyUpdate(ydoc, new Uint8Array(data.update))
+			console.log("on sync: ", ytext.toString())
 		});
 		eventSource.addEventListener('update', (e) => {
 			let data = JSON.parse(e.data)
 			
 			Y.applyUpdate(ydoc, new Uint8Array(data.update))
-			
+			console.log("on update: ", ytext.toString())
 		});
 		eventSource.addEventListener('presence', (e) => {
 			let data = JSON.parse(e.data)
@@ -84,7 +86,7 @@ export default function EditPage() {
 		})
 
 		ydoc.on('update', (update, origin, doc) => {
-			console.log(update)
+			//console.log(update)
 			if(origin === binding) {
 				let payload = ({
 					update: Array.from(update)
@@ -93,11 +95,12 @@ export default function EditPage() {
 				api.post(`/op/${id}`, payload).then((response) => {
 					//console.log(response)
 				})
+				console.log("after send: ", ytext.toString())
 			}
 		})
 
 		editor.on('selection-change', function(range, oldRange, source) {
-			console.log(editor.getModule('cursors'))
+			//console.log(editor.getModule('cursors'))
 			if (source !== null) {
 				api.post(`/presence/${id}`, range).then((res) => {
 
