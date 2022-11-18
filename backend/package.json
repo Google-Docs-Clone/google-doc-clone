@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@elastic/elasticsearch": "^8.5.0",
     "bcryptjs": "^2.4.3",
     "byte-base64": "^1.1.0",
     "connect-mongodb-session": "^3.1.1",

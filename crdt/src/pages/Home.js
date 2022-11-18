@@ -39,6 +39,12 @@ export default function Home() {
             <input type="text" id="name" name="name"/><br/>
             <input type="submit" value="Submit"/>
         </form>
+        <br/>
+        <form action="/index/search" method="get">
+            <label for="name">Query:</label>
+            <input type="text" id="q" name="q"/><br/>
+            <input type="submit" value="Submit"/>
+        </form>
         </>
     )
 

@@ -1,8 +1,6 @@
 var express = require('express');
 var http = require('http');
 const cors = require('cors');
-var expressWinston = require('express-winston');
-var winston = require('winston'); // for transports.Console
 
 const session = require('express-session')
 const mongoDBSession = require('connect-mongodb-session')(session)

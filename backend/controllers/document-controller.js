@@ -2,7 +2,21 @@ const Document = require('../models/document-model.js')
 const path = require("path");
 const fs = require("fs");
 const Y = require('yjs')
+const { Client } = require('@elastic/elasticsearch');
 
+var client = new Client({
+    node: 'https://localhost:9200',
+    auth: {
+        username: 'elastic',
+        password: "GbEZGe27sOAwnV2_=B5k"
+    },
+    tls: {
+        ca: fs.readFileSync('./http_ca.crt'),
+        rejectUnauthorized: false
+      }
+  });
+
+var existWords = {}
 /*
 id: {
     clients: [
@@ -12,7 +26,7 @@ id: {
             id: email
         }  
     ],
-    yjs: [] //full doc
+    doc: Object //full doc
     queue: [] // updates
 }
 */
@@ -43,8 +57,18 @@ createDocument = async (req, res) => {
     docData[savedDocument._id] = {
         clients: [],
         doc: new Y.Doc(),
-        queue: []
+        queue: [],
+        name: name
     }
+
+    await client.index({
+        index: 'yjs',
+        id: savedDocument._id.toString(),
+        document: {
+            name: savedDocument.name,
+            content: ""
+        }
+    }).catch(console.log)
 
     return res
             .status(200)
@@ -66,6 +90,11 @@ deleteDocument = async (req, res) => {
 
     await Document.findByIdAndDelete(id)
 
+    await client.indices.delete({
+        index: "yjs",
+        id: id
+    })
+
     return res
             .status(200)
             .json({
@@ -76,26 +105,7 @@ deleteDocument = async (req, res) => {
 listDocument = async (req, res) => {
     res.set("X-CSE356", "6339f8feca6faf39d6089077");
 
-    for (const id in docData){
-        if (docData.hasOwnProperty(id)) {
-            if (docData[id].queue.length > 0){
-                let queue = docData[id].queue
-                let updates = Y.mergeUpdates(queue)
-                Y.applyUpdate(docData[id].doc, updates)
-                let newDoc = Y.encodeStateAsUpdate(docData[id].doc)
-                Document.findOne({_id: id}, (err, doc) => {
-                    doc.yjs = Array.from(newDoc)
-                    doc.save().then(() => {
-                        //console.log('success')
-                    }).catch(error => {
-                        console.log(error)
-                    })
-                })
-                
-                docData[id].queue = []
-            }
-        }
-    }
+    updateQueue()
 
     const docs = await Document.find().sort({ createdAt: -1 }).limit(10)
     let latestTen = []
@@ -154,6 +164,19 @@ connect = async (req, res) => {
             }).catch(error => {
                 console.log(error)
             })
+            let json = docData[id].doc.getText('quill').toJSON()
+            client.index({
+                index: 'yjs',
+                id: id,
+                refresh:true,
+                document: {
+                    name: docData[id].name,
+                    content: json
+                }
+            }).then(res => {
+                //console.log(res)
+            })
+            bulkUpdate(json)
         })
 
     }else {
@@ -171,7 +194,8 @@ connect = async (req, res) => {
             docData[doc._id] = {
                 clients: [],
                 doc: new Y.Doc(),
-                queue: []
+                queue: [],
+                name: doc.name
             }
             Y.applyUpdate(docData[doc._id].doc, new Uint8Array(doc.yjs))
             res.write(`id:${id}\ndata:${JSON.stringify({update: doc.yjs})}\nevent:sync\n\n`);
@@ -211,7 +235,7 @@ update = async (req, res) => {
         status: 200
     })
 
-    if (docData[docId].queue.length > 100){
+    if (docData[docId].queue.length > 0){
         let queue = docData[docId].queue
         let updates = Y.mergeUpdates(queue)
         Y.applyUpdate(docData[docId].doc, updates)
@@ -225,6 +249,17 @@ update = async (req, res) => {
             })
         })
         docData[docId].queue = []
+        let json = docData[docId].doc.getText('quill').toJSON()
+        await client.index({
+            index: 'yjs',
+            id: docId,
+            refresh:true,
+            document: {
+                name: docData[docId].name,
+                content: json
+            }
+        })
+        bulkUpdate(json)
     }
 }
 
@@ -238,7 +273,7 @@ fileUpload = (req, res) => {
     const newPath = 'media/' + id + ext
     
 
-    if (ext === ".png" || ext === ".jpg") {
+    if (ext === ".png" || ext === ".jpeg" || ext === '.gif') {
         fs.rename(tempPath, newPath, (err) => {
             if (err) return handleError(res, err)
             res 
@@ -287,6 +322,132 @@ updatePresence = (req, res) => {
 
 }
 
+indexSearch = async (req, res) => {
+    updateQueue()
+    
+    let query = req.query.q
+    //console.log(req.query)
+
+    const result = await client.search({
+        index: 'yjs',
+        size: 10,
+        query: {
+            match: {
+                content: {
+                    query: query,
+                    analyzer: "search_analyzer",
+                }
+            }
+        },
+        highlight: {
+            order: "score",
+            fields: {
+                content: {
+                    fragment_size: 70,
+                }
+            }
+        }
+    })
+    let hits = result.hits.hits
+    let response = []
+    for (let i=0; i<hits.length; i++){
+        response.push({
+            docid: hits[i]["_id"],
+            name: hits[i]["_source"]["name"],
+            snippet: hits[i]["highlight"]["content"][0]
+        })
+    }
+    
+
+    res.status(200).json(response)
+    
+}
+
+indexSuggest = async (req, res) => {
+    updateQueue()
+    let query = req.query.q
+
+    const result = await client.search({
+        index: "yjs-suggest",
+        suggest: {
+            autocomplete: {
+                prefix: query,
+                completion: {
+                    field: "suggest"
+                }
+            }
+        }
+    })
+    
+    let response = []
+
+    let options = result.suggest.autocomplete[0].options
+
+    for (let i=0; i<options.length; i++){
+        response.push(options[i]["_source"]['suggest'])
+    }
+
+    res.status(200).json(response)
+}
+
+updateQueue = async () => {
+    for (const id in docData){
+        if (docData.hasOwnProperty(id)) {
+            if (docData[id].queue.length > 0){
+                let queue = docData[id].queue
+                let updates = Y.mergeUpdates(queue)
+                Y.applyUpdate(docData[id].doc, updates)
+                let newDoc = Y.encodeStateAsUpdate(docData[id].doc)
+                Document.findOne({_id: id}, (err, doc) => {
+                    doc.yjs = Array.from(newDoc)
+                    doc.save().then(() => {
+                        //console.log('success')
+                    }).catch(error => {
+                        console.log(error)
+                    })
+                })
+                
+                docData[id].queue = []
+                let json = docData[id].doc.getText('quill').toJSON()
+                await client.index({
+                    index: 'yjs',
+                    id: id,
+                    refresh:true,
+                    document: {
+                        name: docData[id].name,
+                        content: json
+                    }
+                })
+                bulkUpdate(json)
+            }
+        }
+    }
+}
+
+bulkUpdate = async (json) => {
+    let words = json.match(/\b(\w+)\b/g)
+    let bulk = []
+
+    for (const word in words){
+        let lower = words[word].toLowerCase()
+        if(existWords.hasOwnProperty(lower)){
+            continue
+        }
+        existWords[lower] = 1
+        bulk.push({
+            suggest: lower
+        })
+    }
+    const result = await client.helpers.bulk({
+        datasource: bulk,
+        onDocument (doc) {
+            return {
+              index: { _index: 'yjs-suggest' }
+            }
+          }
+    })
+}
+
 module.exports = {
     createDocument,
     deleteDocument,
@@ -295,5 +456,7 @@ module.exports = {
     connect,
     fileUpload,
     fileDownload,
-    updatePresence
+    updatePresence,
+    indexSearch,
+    indexSuggest
 }

@@ -1,0 +1,104 @@
+{
+    "settings": {
+      "analysis": {
+          "analyzer": {
+            "search_analyzer": {
+              "filter": [
+                "stop",
+                "lowercase",
+                "stemmer"
+              ],
+              "type": "custom",
+              "tokenizer": "standard"
+            },
+            "auto_analyzer": {
+              "filter": [
+                "lowercase"
+              ],
+              "type": "custom",
+             "tokenizer": "standard"
+            }
+          }
+        }
+    },
+    "mappings": {
+      "properties": {
+        "suggest": {
+          "type": "completion"
+        },
+        "text": {
+          "type": "text"
+        }
+      }
+    }
+  }
+
+=================================================
+
+{
+  "settings": {
+      "analysis": {
+          "analyzer": {
+            "search_analyzer": {
+              "filter": [
+                "stop",
+                "lowercase",
+                "stemmer"
+              ],
+              "type": "custom",
+              "tokenizer": "standard"
+            }
+          }
+        }
+    },
+    "mappings": {
+      "properties": {
+        "content": {
+          "type": "text",
+          "analyzer": "english",
+          "fields": {
+          "exact": {
+            "type": "text",
+            "analyzer": "search_analyzer"
+          }
+        }
+      },
+      "name": {
+        "type": "text",
+          "analyzer": "english",
+          "fields": {
+          "exact": {
+            "type": "text",
+            "analyzer": "search_analyzer"
+          }
+        }
+      }
+    }
+  }
+}
+
+
+====================================
+
+{
+  "mappings": {
+    "properties": {
+      "suggest": {
+        "type": "completion"
+      }
+    }
+  },
+  "settings": {
+    "analysis": {
+          "analyzer": {
+            "auto_analyzer": {
+              "filter": [
+                "lowercase"
+              ],
+              "type": "custom",
+              "tokenizer": "standard"
+            }
+          }
+        }
+  }
+}

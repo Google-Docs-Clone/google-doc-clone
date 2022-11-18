@@ -42,4 +42,7 @@ router.get('/media/access/:mediaid', auth, DocumentController.fileDownload)
 //router.get('/home', auth, FrontEndController.getLib)
 router.get('/library/crdt.js', FrontEndController.getLib)
 
+router.get('/index/search', auth, DocumentController.indexSearch)
+router.get('/index/suggest', auth, DocumentController.indexSuggest)
+
 module.exports = router
