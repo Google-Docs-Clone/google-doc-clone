@@ -3,15 +3,16 @@ const path = require("path");
 const fs = require("fs");
 const Y = require('yjs')
 const { Client } = require('@elastic/elasticsearch');
+const axios = require('axios');
 
 var client = new Client({
     node: 'https://localhost:9200',
     auth: {
         username: 'elastic',
-        password: "GbEZGe27sOAwnV2_=B5k"
+        password: "eRFQRayKXqYyeaQDEha-"
     },
     tls: {
-        ca: fs.readFileSync('./http_ca.crt'),
+        ca: fs.readFileSync('/etc/elasticsearch/certs/http_ca.crt'),
         rejectUnauthorized: false
       }
   });
@@ -64,11 +65,13 @@ createDocument = async (req, res) => {
     await client.index({
         index: 'yjs',
         id: savedDocument._id.toString(),
+        refresh: true,
         document: {
             name: savedDocument.name,
             content: ""
         }
     }).catch(console.log)
+    //await axios.post("http://localhost:9200/_refresh")
 
     return res
             .status(200)
@@ -83,14 +86,16 @@ deleteDocument = async (req, res) => {
 
     if (!id) { return handleError(res, 'invalid id for deletion') }
 
-    docData[id].clients.forEach(client => {
-        client.res.end()
-    })
+    if(docData.hasOwnProperty(id)){
+        docData[id].clients.forEach(client => {
+            client.res.end()
+        })
+    }
     delete docData[id]
 
     await Document.findByIdAndDelete(id)
 
-    await client.indices.delete({
+    await client.delete({
         index: "yjs",
         id: id
     })
@@ -157,28 +162,20 @@ connect = async (req, res) => {
         docData[id].clients.forEach(client => {
             res.write(`id:${id}\ndata:${JSON.stringify({session_id: req.session.token, name: req.session.name, cursor: {index: client.cursor.index, length: client.cursor.length}, id: client.name})}\nevent:presence\n\n`);
         })
-        Document.findOne({_id: id}, (err, doc) => {
-            doc.yjs = Array.from(newDoc)
-            doc.save().then(() => {
-                //console.log('success')
-            }).catch(error => {
-                console.log(error)
-            })
-            let json = docData[id].doc.getText('quill').toJSON()
-            client.index({
-                index: 'yjs',
-                id: id,
-                refresh:true,
-                document: {
-                    name: docData[id].name,
-                    content: json
-                }
-            }).then(res => {
-                //console.log(res)
-            })
-            bulkUpdate(json)
+        //await Document.findOneAndUpdate({_id: id}, {yjs : Array.from(newDoc)})
+            
+        let json = docData[id].doc.getText('quill').toJSON()
+        client.index({
+            index: 'yjs',
+            id: id,
+            refresh: true,
+            document: {
+                //name: docData[id].name,
+                content: json
+            }
         })
-
+        //await axios.post("http://localhost:9200/_refresh")
+        bulkUpdate(json)
     }else {
         Document.findById(id, (err, doc) => {
             if (err || doc === null) return res.end()
@@ -235,31 +232,26 @@ update = async (req, res) => {
         status: 200
     })
 
-    if (docData[docId].queue.length > 0){
+    if (docData[docId].queue.length > 100){
         let queue = docData[docId].queue
         let updates = Y.mergeUpdates(queue)
         Y.applyUpdate(docData[docId].doc, updates)
-        let newDoc = Y.encodeStateAsUpdate(docData[docId].doc)
-        Document.findOne({_id: docId}, (err, doc) => {
-            doc.yjs = Array.from(newDoc)
-            doc.save().then(() => {
-                //console.log('success')
-            }).catch(error => {
-                console.log(error)
-            })
-        })
+        //let newDoc = Y.encodeStateAsUpdate(docData[docId].doc)
+        //await Document.findOneAndUpdate({_id: docId}, {yjs: Array.from(newDoc)})
         docData[docId].queue = []
         let json = docData[docId].doc.getText('quill').toJSON()
         await client.index({
             index: 'yjs',
             id: docId,
-            refresh:true,
+            refresh: true,
             document: {
-                name: docData[docId].name,
+                //name: docData[docId].name,
                 content: json
             }
         })
+        //await axios.post("http://localhost:9200/_refresh")
         bulkUpdate(json)
+        
     }
 }
 
@@ -271,9 +263,8 @@ fileUpload = (req, res) => {
     let id = tempPath.slice(6)
 
     const newPath = 'media/' + id + ext
-    
 
-    if (ext === ".png" || ext === ".jpeg" || ext === '.gif') {
+    if (ext === ".png" || ext === ".jpeg" || ext === '.gif' || ext === ".jpg") {
         fs.rename(tempPath, newPath, (err) => {
             if (err) return handleError(res, err)
             res 
@@ -321,73 +312,85 @@ updatePresence = (req, res) => {
     res.status(200).json({status: "OK"})
 
 }
-
+var count = 1
 indexSearch = async (req, res) => {
+    console.log('search')
     updateQueue()
+    //const data = await axios.get("http://localhost:9200/_search")
+    //console.log(data.data.hits.hits)
+    //console.log('=============================================', count)
+    count++
     
     let query = req.query.q
     //console.log(req.query)
 
-    const result = await client.search({
-        index: 'yjs',
-        size: 10,
-        query: {
-            match: {
-                content: {
-                    query: query,
-                    analyzer: "search_analyzer",
+    setTimeout(async () => {
+        const result = await client.search({
+            index: 'yjs',
+            size: 10,
+            query: {
+                match: {
+                    content: {
+                        query: query,
+                        analyzer: "search_analyzer",
+                    }
+                }
+            },
+            highlight: {
+                order: "score",
+                fields: {
+                    content: {
+                        fragment_size: 70,
+                        number_of_fragments: 5
+                    }
                 }
             }
-        },
-        highlight: {
-            order: "score",
-            fields: {
-                content: {
-                    fragment_size: 70,
-                }
-            }
-        }
-    })
-    let hits = result.hits.hits
-    let response = []
-    for (let i=0; i<hits.length; i++){
-        response.push({
-            docid: hits[i]["_id"],
-            name: hits[i]["_source"]["name"],
-            snippet: hits[i]["highlight"]["content"][0]
         })
-    }
+        let hits = result.hits.hits
+        let response = []
+        //console.log("hits:", hits)
+        for (let i=0; i<hits.length; i++){
+            response.push({
+                docid: hits[i]["_id"],
+                name: hits[i]["_source"]["name"],
+                snippet: hits[i]["highlight"]["content"].join(' ')
+            })
+        }
+        //console.log("response:", response)
     
-
-    res.status(200).json(response)
+        res.status(200).json(response)
+    }, 300);
     
 }
 
 indexSuggest = async (req, res) => {
+    console.log('suggest')
     updateQueue()
     let query = req.query.q
 
-    const result = await client.search({
-        index: "yjs-suggest",
-        suggest: {
-            autocomplete: {
-                prefix: query,
-                completion: {
-                    field: "suggest"
+    setTimeout(async () => {
+        const result = await client.search({
+            index: "yjs-suggest",
+            suggest: {
+                autocomplete: {
+                    prefix: query,
+                    completion: {
+                        field: "suggest"
+                    }
                 }
             }
-        }
-    })
+        })
+        
+        let response = []
     
-    let response = []
-
-    let options = result.suggest.autocomplete[0].options
-
-    for (let i=0; i<options.length; i++){
-        response.push(options[i]["_source"]['suggest'])
-    }
-
-    res.status(200).json(response)
+        let options = result.suggest.autocomplete[0].options
+    
+        for (let i=0; i<options.length; i++){
+            response.push(options[i]["_source"]['suggest'])
+        }
+        //console.log(response)
+        res.status(200).json(response)
+    }, 300);
 }
 
 updateQueue = async () => {
@@ -397,27 +400,22 @@ updateQueue = async () => {
                 let queue = docData[id].queue
                 let updates = Y.mergeUpdates(queue)
                 Y.applyUpdate(docData[id].doc, updates)
-                let newDoc = Y.encodeStateAsUpdate(docData[id].doc)
-                Document.findOne({_id: id}, (err, doc) => {
-                    doc.yjs = Array.from(newDoc)
-                    doc.save().then(() => {
-                        //console.log('success')
-                    }).catch(error => {
-                        console.log(error)
-                    })
-                })
+                //let newDoc = Y.encodeStateAsUpdate(docData[id].doc)
+                //await Document.findOneAndUpdate({_id: id}, {yjs:  Array.from(newDoc)})
                 
                 docData[id].queue = []
                 let json = docData[id].doc.getText('quill').toJSON()
-                await client.index({
+                let res = await client.index({
                     index: 'yjs',
                     id: id,
-                    refresh:true,
+                    refresh: true,
                     document: {
-                        name: docData[id].name,
+                        //name: docData[id].name,
                         content: json
                     }
                 })
+                //await axios.post("http://localhost:9200/_refresh")
+                //console.log(res)
                 bulkUpdate(json)
             }
         }
@@ -430,22 +428,24 @@ bulkUpdate = async (json) => {
 
     for (const word in words){
         let lower = words[word].toLowerCase()
-        if(existWords.hasOwnProperty(lower)){
+        if (existWords.hasOwnProperty(lower)){
             continue
         }
         existWords[lower] = 1
         bulk.push({
-            suggest: lower
+            suggest: lower,
         })
     }
     const result = await client.helpers.bulk({
         datasource: bulk,
         onDocument (doc) {
             return {
-              index: { _index: 'yjs-suggest' }
+              index: { _index: 'yjs-suggest' },
+              refresh: true,
             }
           }
     })
+    //await axios.post("http://localhost:9200/_refresh")
 }
 
 module.exports = {

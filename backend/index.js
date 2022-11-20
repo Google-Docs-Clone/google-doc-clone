@@ -1,7 +1,7 @@
 var express = require('express');
 var http = require('http');
 const cors = require('cors');
-
+require('events').EventEmitter.defaultMaxListeners = 200;
 const session = require('express-session')
 const mongoDBSession = require('connect-mongodb-session')(session)
 const store = new mongoDBSession({
@@ -67,15 +67,6 @@ app.use(function(req, res, next) {
 
 const router = require('./routes/index')
 
-// app.use(expressWinston.logger({
-//   transports: [
-//     new winston.transports.Console()
-//   ],
-//   format: winston.format.combine(
-//     winston.format.colorize(),
-//     winston.format.json()
-//   ),
-// }));
 
 app.use('/', router)
 
@@ -100,16 +91,7 @@ app.use('/register', express.static('build', {
   }
 }))
 
-// app.use(expressWinston.logger({
-//   transports: [
-//     new winston.transports.Console()
-//   ],
-//   format: winston.format.combine(
-//     winston.format.colorize(),
-//     winston.format.json()
-//   )
-// }));
 
-server.listen(4000, function(){
+server.listen(80, function(){
     console.log("server is running on port 4000");
 })
