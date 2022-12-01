@@ -1,10 +1,18 @@
 var express = require('express');
 var http = require('http');
 const cors = require('cors');
+var app = express();
 require('events').EventEmitter.defaultMaxListeners = 200;
+
+const dotenv = require('dotenv')
+dotenv.config();
+
+const db = require('./db')
+db.on('error', console.error.bind(console, 'MongoDB connection error:'))
+
 const session = require('express-session')
-const mongoDBSession = require('connect-mongodb-session')(session)
-const store = new mongoDBSession({
+const mongoDBStore = require('connect-mongodb-session')(session)
+const store = new mongoDBStore({
     uri: process.env.DB_CONNECT,
     collection: 'sessions'
 })
@@ -25,12 +33,6 @@ const auth = (req, res, next) => {
 }
 
 const cookieParser = require('cookie-parser')
-
-var app = express();
-var server = http.createServer(app);
-
-const db = require('./db')
-db.on('error', console.error.bind(console, 'MongoDB connection error:'))
 
 app.use(cors({credentials: true, origin: true}));
 //app.use(express.static('build'));
@@ -91,6 +93,7 @@ app.use('/register', express.static('build', {
   }
 }))
 
+var server = http.createServer(app);
 
 server.listen(4000, function(){
     console.log("server is running on port 4000");
