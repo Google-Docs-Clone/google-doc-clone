@@ -9,7 +9,7 @@ var client = new Client({
     node: 'https://localhost:9200',
     auth: {
         username: 'elastic',
-        password: "eRFQRayKXqYyeaQDEha-"
+        password: "lMLopLWNR11Ve*uMEhoV"
     },
     tls: {
         ca: fs.readFileSync('/etc/elasticsearch/certs/http_ca.crt'),
@@ -110,7 +110,7 @@ deleteDocument = async (req, res) => {
 listDocument = async (req, res) => {
     res.set("X-CSE356", "6339f8feca6faf39d6089077");
 
-    updateQueue()
+    //updateQueue()
 
     const docs = await Document.find().sort({ createdAt: -1 }).limit(10)
     let latestTen = []
@@ -164,18 +164,18 @@ connect = async (req, res) => {
         })
         //await Document.findOneAndUpdate({_id: id}, {yjs : Array.from(newDoc)})
             
-        let json = docData[id].doc.getText('quill').toJSON()
-        client.index({
-            index: 'yjs',
-            id: id,
-            refresh: true,
-            document: {
-                //name: docData[id].name,
-                content: json
-            }
-        })
+        // let json = docData[id].doc.getText('quill').toJSON()
+        // client.index({
+        //     index: 'yjs',
+        //     id: id,
+        //     refresh: true,
+        //     document: {
+        //         name: docData[id].name,
+        //         content: json
+        //     }
+        // })
         //await axios.post("http://localhost:9200/_refresh")
-        bulkUpdate(json)
+        //bulkUpdate(json)
     }else {
         Document.findById(id, (err, doc) => {
             if (err || doc === null) return res.end()
@@ -232,27 +232,27 @@ update = async (req, res) => {
         status: 200
     })
 
-    if (docData[docId].queue.length > 100){
-        let queue = docData[docId].queue
-        let updates = Y.mergeUpdates(queue)
-        Y.applyUpdate(docData[docId].doc, updates)
-        //let newDoc = Y.encodeStateAsUpdate(docData[docId].doc)
-        //await Document.findOneAndUpdate({_id: docId}, {yjs: Array.from(newDoc)})
-        docData[docId].queue = []
-        let json = docData[docId].doc.getText('quill').toJSON()
-        await client.index({
-            index: 'yjs',
-            id: docId,
-            refresh: true,
-            document: {
-                //name: docData[docId].name,
-                content: json
-            }
-        })
-        //await axios.post("http://localhost:9200/_refresh")
-        bulkUpdate(json)
+    // if (docData[docId].queue.length > 100){
+    //     let queue = docData[docId].queue
+    //     let updates = Y.mergeUpdates(queue)
+    //     Y.applyUpdate(docData[docId].doc, updates)
+    //     //let newDoc = Y.encodeStateAsUpdate(docData[docId].doc)
+    //     //await Document.findOneAndUpdate({_id: docId}, {yjs: Array.from(newDoc)})
+    //     docData[docId].queue = []
+    //     let json = docData[docId].doc.getText('quill').toJSON()
+    //     await client.index({
+    //         index: 'yjs',
+    //         id: docId,
+    //         refresh: true,
+    //         document: {
+    //             name: docData[docId].name,
+    //             content: json
+    //         }
+    //     })
+    //     //await axios.post("http://localhost:9200/_refresh")
+    //     bulkUpdate(json)
         
-    }
+    // }
 }
 
 fileUpload = (req, res) => {
@@ -314,8 +314,8 @@ updatePresence = (req, res) => {
 }
 var count = 1
 indexSearch = async (req, res) => {
-    console.log('search')
-    updateQueue()
+    //console.log('search')
+    //updateQueue()
     //const data = await axios.get("http://localhost:9200/_search")
     //console.log(data.data.hits.hits)
     //console.log('=============================================', count)
@@ -364,8 +364,8 @@ indexSearch = async (req, res) => {
 }
 
 indexSuggest = async (req, res) => {
-    console.log('suggest')
-    updateQueue()
+    //console.log('suggest')
+    //updateQueue()
     let query = req.query.q
 
     setTimeout(async () => {
@@ -400,8 +400,8 @@ updateQueue = async () => {
                 let queue = docData[id].queue
                 let updates = Y.mergeUpdates(queue)
                 Y.applyUpdate(docData[id].doc, updates)
-                //let newDoc = Y.encodeStateAsUpdate(docData[id].doc)
-                //await Document.findOneAndUpdate({_id: id}, {yjs:  Array.from(newDoc)})
+                let newDoc = Y.encodeStateAsUpdate(docData[id].doc)
+                await Document.findOneAndUpdate({_id: id}, {yjs:  Array.from(newDoc)})
                 
                 docData[id].queue = []
                 let json = docData[id].doc.getText('quill').toJSON()
@@ -410,7 +410,7 @@ updateQueue = async () => {
                     id: id,
                     refresh: true,
                     document: {
-                        //name: docData[id].name,
+                        name: docData[id].name,
                         content: json
                     }
                 })
@@ -447,6 +447,8 @@ bulkUpdate = async (json) => {
     })
     //await axios.post("http://localhost:9200/_refresh")
 }
+
+setInterval(updateQueue, 150);
 
 module.exports = {
     createDocument,

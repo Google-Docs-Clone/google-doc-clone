@@ -92,6 +92,6 @@ app.use('/register', express.static('build', {
 }))
 
 
-server.listen(80, function(){
+server.listen(4000, function(){
     console.log("server is running on port 4000");
 })
