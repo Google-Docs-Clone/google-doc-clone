@@ -6,13 +6,13 @@ const { Client } = require('@elastic/elasticsearch');
 const axios = require('axios');
 
 var client = new Client({
-    node: 'https://localhost:9200',
+    node: 'https://209.151.152.235:9200',
     auth: {
         username: 'elastic',
-        password: "lMLopLWNR11Ve*uMEhoV"
+        password: "W063lUQqlIeVFeaR1SOc"
     },
     tls: {
-        ca: fs.readFileSync('/etc/elasticsearch/certs/http_ca.crt'),
+        ca: fs.readFileSync('/root/google-doc-clone/http_ca.crt'),
         rejectUnauthorized: false
       }
   });
@@ -52,15 +52,19 @@ createDocument = async (req, res) => {
         name: name,
         yjs: [0,0]
     })
-
     const savedDocument = await newDocument.save()
-
     docData[savedDocument._id] = {
         clients: [],
         doc: new Y.Doc(),
         queue: [],
         name: name
     }
+
+    res
+    .status(200)
+    .json({
+        id: savedDocument._id
+    })
 
     await client.index({
         index: 'yjs',
@@ -71,13 +75,6 @@ createDocument = async (req, res) => {
             content: ""
         }
     }).catch(console.log)
-    //await axios.post("http://localhost:9200/_refresh")
-
-    return res
-            .status(200)
-            .json({
-                id: savedDocument._id
-            })
 }
 
 deleteDocument = async (req, res) => {
@@ -109,8 +106,6 @@ deleteDocument = async (req, res) => {
 
 listDocument = async (req, res) => {
     res.set("X-CSE356", "6339f8feca6faf39d6089077");
-
-    //updateQueue()
 
     const docs = await Document.find().sort({ createdAt: -1 }).limit(10)
     let latestTen = []
@@ -162,20 +157,6 @@ connect = async (req, res) => {
         docData[id].clients.forEach(client => {
             res.write(`id:${id}\ndata:${JSON.stringify({session_id: req.session.token, name: req.session.name, cursor: {index: client.cursor.index, length: client.cursor.length}, id: client.name})}\nevent:presence\n\n`);
         })
-        //await Document.findOneAndUpdate({_id: id}, {yjs : Array.from(newDoc)})
-            
-        // let json = docData[id].doc.getText('quill').toJSON()
-        // client.index({
-        //     index: 'yjs',
-        //     id: id,
-        //     refresh: true,
-        //     document: {
-        //         name: docData[id].name,
-        //         content: json
-        //     }
-        // })
-        //await axios.post("http://localhost:9200/_refresh")
-        //bulkUpdate(json)
     }else {
         Document.findById(id, (err, doc) => {
             if (err || doc === null) return res.end()
@@ -231,28 +212,6 @@ update = async (req, res) => {
     res.json({
         status: 200
     })
-
-    // if (docData[docId].queue.length > 100){
-    //     let queue = docData[docId].queue
-    //     let updates = Y.mergeUpdates(queue)
-    //     Y.applyUpdate(docData[docId].doc, updates)
-    //     //let newDoc = Y.encodeStateAsUpdate(docData[docId].doc)
-    //     //await Document.findOneAndUpdate({_id: docId}, {yjs: Array.from(newDoc)})
-    //     docData[docId].queue = []
-    //     let json = docData[docId].doc.getText('quill').toJSON()
-    //     await client.index({
-    //         index: 'yjs',
-    //         id: docId,
-    //         refresh: true,
-    //         document: {
-    //             name: docData[docId].name,
-    //             content: json
-    //         }
-    //     })
-    //     //await axios.post("http://localhost:9200/_refresh")
-    //     bulkUpdate(json)
-        
-    // }
 }
 
 fileUpload = (req, res) => {
@@ -312,85 +271,65 @@ updatePresence = (req, res) => {
     res.status(200).json({status: "OK"})
 
 }
-var count = 1
 indexSearch = async (req, res) => {
-    //console.log('search')
-    //updateQueue()
-    //const data = await axios.get("http://localhost:9200/_search")
-    //console.log(data.data.hits.hits)
-    //console.log('=============================================', count)
-    count++
-    
     let query = req.query.q
-    //console.log(req.query)
 
-    setTimeout(async () => {
-        const result = await client.search({
-            index: 'yjs',
-            size: 10,
-            query: {
-                match: {
-                    content: {
-                        query: query,
-                        analyzer: "search_analyzer",
-                    }
-                }
-            },
-            highlight: {
-                order: "score",
-                fields: {
-                    content: {
-                        fragment_size: 70,
-                        number_of_fragments: 5
-                    }
+    const result = await client.search({
+        index: 'yjs',
+        size: 10,
+        query: {
+            match: {
+                content: {
+                    query: query,
+                    analyzer: "search_analyzer",
                 }
             }
-        })
-        let hits = result.hits.hits
-        let response = []
-        //console.log("hits:", hits)
-        for (let i=0; i<hits.length; i++){
-            response.push({
-                docid: hits[i]["_id"],
-                name: hits[i]["_source"]["name"],
-                snippet: hits[i]["highlight"]["content"].join(' ')
-            })
+        },
+        highlight: {
+            order: "score",
+            fields: {
+                content: {
+                    fragment_size: 70,
+                    number_of_fragments: 5
+                }
+            }
         }
-        //console.log("response:", response)
-    
-        res.status(200).json(response)
-    }, 300);
-    
+    })
+    let hits = result.hits.hits
+    let response = []
+    for (let i=0; i<hits.length; i++){
+        response.push({
+            docid: hits[i]["_id"],
+            name: hits[i]["_source"]["name"],
+            snippet: hits[i]["highlight"]["content"].join(' ')
+        })
+    }
+    res.status(200).json(response)
 }
 
 indexSuggest = async (req, res) => {
-    //console.log('suggest')
-    //updateQueue()
     let query = req.query.q
 
-    setTimeout(async () => {
-        const result = await client.search({
-            index: "yjs-suggest",
-            suggest: {
-                autocomplete: {
-                    prefix: query,
-                    completion: {
-                        field: "suggest"
-                    }
+    const result = await client.search({
+        index: "yjs-suggest",
+        suggest: {
+            autocomplete: {
+                prefix: query,
+                completion: {
+                    field: "suggest"
                 }
             }
-        })
-        
-        let response = []
-    
-        let options = result.suggest.autocomplete[0].options
-    
-        for (let i=0; i<options.length; i++){
-            response.push(options[i]["_source"]['suggest'])
         }
-        //console.log(response)
-        res.status(200).json(response)
-    }, 300);
+    })
+    
+    let response = []
+
+    let options = result.suggest.autocomplete[0].options
+
+    for (let i=0; i<options.length; i++){
+        response.push(options[i]["_source"]['suggest'])
+    }
+    res.status(200).json(response)
 }
 
 updateQueue = async () => {
@@ -414,8 +353,6 @@ updateQueue = async () => {
                         content: json
                     }
                 })
-                //await axios.post("http://localhost:9200/_refresh")
-                //console.log(res)
                 bulkUpdate(json)
             }
         }
@@ -445,10 +382,9 @@ bulkUpdate = async (json) => {
             }
           }
     })
-    //await axios.post("http://localhost:9200/_refresh")
 }
 
-setInterval(updateQueue, 150);
+//setInterval(updateQueue, 150);
 
 module.exports = {
     createDocument,

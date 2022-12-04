@@ -18,8 +18,7 @@ const store = new mongoDBStore({
 })
 const auth = (req, res, next) => {
   res.setHeader('X-CSE356', '6306cc6d58d8bb3ef7f6b85b');
-  //console.log(req)
-  console.log(req.session)
+
   if (req.session.user){
       next()
   }else{
@@ -35,7 +34,6 @@ const auth = (req, res, next) => {
 const cookieParser = require('cookie-parser')
 
 app.use(cors({credentials: true, origin: true}));
-//app.use(express.static('build'));
 
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());

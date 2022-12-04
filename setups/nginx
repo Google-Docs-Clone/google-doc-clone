@@ -51,10 +51,38 @@ server {
 		# as directory, then fall back to displaying a 404.
 		proxy_set_header   X-Forwarded-For $remote_addr;
 		proxy_set_header   Host $http_host;
-		proxy_pass         http://209.94.59.249:4000;
+		proxy_pass         http://209.151.151.132:4000;
 		proxy_set_header Connection '';
 		proxy_http_version 1.1;
 		chunked_transfer_encoding off;
+		proxy_buffering off;
+		proxy_cache off;
+	}
+
+	location /api {
+		proxy_set_header   X-Forwarded-For $remote_addr;
+		proxy_set_header   Host $http_host;
+		proxy_http_version 1.1;
+
+		proxy_pass         http://api;
+		proxy_set_header Connection '';
+		
+		chunked_transfer_encoding off;
+		proxy_buffering off;
+		proxy_cache off;
+	}
+
+	location /index {
+		proxy_set_header   X-Forwarded-For $remote_addr;
+		proxy_set_header   Host $http_host;
+		proxy_http_version 1.1;
+
+		proxy_pass         http://search;
+		proxy_set_header Connection '';
+		
+		chunked_transfer_encoding off;
+		proxy_buffering off;
+		proxy_cache off;
 	}
 
 	# pass PHP scripts to FastCGI server
