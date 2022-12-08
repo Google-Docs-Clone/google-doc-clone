@@ -70,11 +70,7 @@ var client = new Client({
     auth: {
         username: 'elastic',
         password: "W063lUQqlIeVFeaR1SOc"
-    },
-    tls: {
-        ca: fs.readFileSync('/root/google-doc-clone/http_ca.crt'),
-        rejectUnauthorized: false
-      }
+    }
   });
 
 var existWords = {}
@@ -148,7 +144,6 @@ app.post('/api/op/:id', auth, (req, res) => {
 	let docId = req.params.id;
 	const {update} = req.body;
 
-
 	res.json({
 		status: 200
 	})
@@ -171,38 +166,29 @@ updateQueue = async () => {
                       content: json
                   }
               })
-              bulkUpdate(json)
+              bulkUpdate(json, id)
           }
       }
   }
 }
 
 bulkUpdate = async (json) => {
-  let words = json.match(/\b(\w+)\b/g)
-  let bulk = []
-
-  for (const word in words){
-      let lower = words[word].toLowerCase()
-      if (existWords.hasOwnProperty(lower)){
-          continue
-      }
-      existWords[lower] = 1
-      bulk.push({
-          suggest: lower,
-      })
-  }
-  const result = await client.helpers.bulk({
-      datasource: bulk,
-      onDocument (doc) {
-          return {
-            index: { _index: 'yjs-suggest' },
-            refresh: true,
-          }
-        }
-  })
+    let words = json.match(/\b(\w+)\b/g)
+    if(words){
+        words = words.map(word => word.toLowerCase())
+        words = [...new Set(words)];
+        words = words.filter(word => word.length > 6)
+        client.index({
+            index: 'yjs-suggest',
+            id: id,
+            document: {
+                suggest: words
+            }
+        })
+    }
 }
 
-setInterval(updateQueue, 1000);
+setInterval(updateQueue, 5000);
 
 
 var server = http.createServer(app);

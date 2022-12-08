@@ -15,11 +15,7 @@ var client = new Client({
     auth: {
         username: 'elastic',
         password: "W063lUQqlIeVFeaR1SOc"
-    },
-    tls: {
-        ca: fs.readFileSync('/root/index/http_ca.crt'),
-        rejectUnauthorized: false
-      }
+    }
 });
 
 app.use(express.urlencoded({extended: true}));
@@ -34,11 +30,11 @@ app.get('/index/search', async (req, res) => {
         const result = await client.search({
             index: 'yjs',
             size: 10,
+            _source: false,
             query: {
                 match: {
                     content: {
                         query: query,
-                        analyzer: "search_analyzer",
                     }
                 }
             },
@@ -46,8 +42,8 @@ app.get('/index/search', async (req, res) => {
                 order: "score",
                 fields: {
                     content: {
-                        fragment_size: 50,
-                        number_of_fragments: 5
+                        fragment_size: 30,
+                        number_of_fragments: 3
                     }
                 }
             }
@@ -57,7 +53,7 @@ app.get('/index/search', async (req, res) => {
         for (let i=0; i<hits.length; i++){
             response.push({
                 docid: hits[i]["_id"],
-                name: hits[i]["_source"]["name"],
+                name: "Milestone #4",
                 snippet: hits[i]["highlight"]["content"].join(' ')
             })
         }
@@ -75,11 +71,13 @@ app.get('/index/suggest', async (req, res) => {
 
         const result = await client.search({
             index: "yjs-suggest",
+            _source: false,
             suggest: {
                 autocomplete: {
                     prefix: query,
                     completion: {
-                        field: "suggest"
+                        field: "suggest",
+                        skip_duplicates: true
                     }
                 }
             }

@@ -1,41 +1,4 @@
 {
-    "settings": {
-      "analysis": {
-          "analyzer": {
-            "search_analyzer": {
-              "filter": [
-                "stop",
-                "lowercase",
-                "stemmer"
-              ],
-              "type": "custom",
-              "tokenizer": "standard"
-            },
-            "auto_analyzer": {
-              "filter": [
-                "lowercase"
-              ],
-              "type": "custom",
-             "tokenizer": "standard"
-            }
-          }
-        }
-    },
-    "mappings": {
-      "properties": {
-        "suggest": {
-          "type": "completion"
-        },
-        "text": {
-          "type": "text"
-        }
-      }
-    }
-  }
-
-=================================================
-
-{
   "settings": {
       "analysis": {
           "analyzer": {
@@ -43,10 +6,10 @@
               "filter": [
                 "stop",
                 "lowercase",
-                "stemmer"
+                "porter_stem"
               ],
               "type": "custom",
-              "tokenizer": "standard"
+              "tokenizer": "whitespace"
             }
           }
         }
@@ -57,20 +20,10 @@
           "type": "text",
           "analyzer": "english",
           "fields": {
-          "exact": {
-            "type": "text",
-            "analyzer": "search_analyzer"
-          }
-        }
-      },
-      "name": {
-        "type": "text",
-          "analyzer": "english",
-          "fields": {
-          "exact": {
-            "type": "text",
-            "analyzer": "search_analyzer"
-          }
+            "exact": {
+              "type": "text",
+              "analyzer": "search_analyzer"
+            }
         }
       }
     }
@@ -87,18 +40,5 @@
         "type": "completion"
       }
     }
-  },
-  "settings": {
-    "analysis": {
-          "analyzer": {
-            "auto_analyzer": {
-              "filter": [
-                "lowercase"
-              ],
-              "type": "custom",
-              "tokenizer": "standard"
-            }
-          }
-        }
   }
 }
