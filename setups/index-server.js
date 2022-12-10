@@ -11,61 +11,73 @@ app.use(cors({credentials: true, origin: true}));
 const { Client } = require('@elastic/elasticsearch');
 
 var client = new Client({
-    node: 'https://209.151.152.235:9200',
+    node: 'https://209.151.155.155:9200',
     auth: {
         username: 'elastic',
-        password: "W063lUQqlIeVFeaR1SOc"
+        password: "6KPmCS=hL*Pnyc-hcJ1y"
+    },
+    tls: {
+        ca: fs.readFileSync('/root/index/http_ca.crt'),
+        rejectUnauthorized: false
     }
 });
+
+var Memcached = require('memcached');
+var memcached = new Memcached('127.0.0.1:11211', {})
 
 app.use(express.urlencoded({extended: true}));
 app.use(express.json());
 
-var existWords = {}
-
 app.get('/index/search', async (req, res) => {
-    try {
-        let query = req.query.q
-
-        const result = await client.search({
-            index: 'yjs',
-            size: 10,
-            _source: false,
-            query: {
-                match: {
-                    content: {
-                        query: query,
+    let query = req.query.q
+    memcached.get(query, (err, data) =>{
+        if (data){
+            return res.status(200).json(data)
+        }else{
+            try {
+                client.search({
+                    index: 'yjs',
+                    size: 10,
+                    _source: false,
+                    query: {
+                        match: {
+                            content: {
+                                query: query,
+                            }
+                        }
+                    },
+                    highlight: {
+                        order: "score",
+                        fields: {
+                            content: {
+                                fragment_size: 30,
+                                number_of_fragments: 3
+                            }
+                        }
                     }
-                }
-            },
-            highlight: {
-                order: "score",
-                fields: {
-                    content: {
-                        fragment_size: 30,
-                        number_of_fragments: 3
+                }).then(result => {
+                    let hits = result.hits.hits
+                    let response = []
+                    for (let i=0; i<hits.length; i++){
+                        response.push({
+                            docid: hits[i]["_id"],
+                            name: "Milestone #4",
+                            snippet: hits[i]["highlight"]["content"].join(' ')
+                        })
                     }
-                }
+                    
+                    res.status(200).json(response)
+                    memcached.set(query, response, 0.5, function (err) {  });
+                })
+                
+            } catch (error) {
+                console.log(error)
             }
-        })
-        let hits = result.hits.hits
-        let response = []
-        for (let i=0; i<hits.length; i++){
-            response.push({
-                docid: hits[i]["_id"],
-                name: "Milestone #4",
-                snippet: hits[i]["highlight"]["content"].join(' ')
-            })
         }
-
-        res.status(200).json(response)
-    } catch (error) {
-        console.log(error)
-    }
+    });
 })
 
 app.get('/index/suggest', async (req, res) => {
-
     try {
         let query = req.query.q
 
@@ -90,6 +102,37 @@ app.get('/index/suggest', async (req, res) => {
         for (let i=0; i<options.length; i++){
             response.push(options[i]["text"])
         }
+
+        // without a new index
+        // const result = await client.search({
+        //     "_source": false,
+        //     "query": {
+        //         "match_phrase_prefix": {
+        //             "content": query
+        //         }
+        //     },
+        //     "highlight": {
+        //         "order": "score",
+        //         "boundary_scanner": "word",
+        //         "pre_tags": [""],
+        //         "post_tags": [""], 
+        //         "fields": {
+        //           "content": {}
+        //         }
+        //     }
+        // })
+        
+        // let response = []
+
+        // let hits = result.hits.hits
+
+        // for (let i=0; i<hits.length; i++){
+        //     let word = hits[i]["highlight"]['content'][0]
+        //     if (!response.includes(word)){
+        //         response.push(word)
+        //     }
+        // }
+
         res.status(200).json(response)
     } catch (error) {
         console.log(error)
@@ -100,6 +143,8 @@ app.get('/index/suggest', async (req, res) => {
 
 var server = http.createServer(app);
 
-server.listen(3000, function(){
-    console.log("server is running on port 3000");
+let port = 3000
+
+server.listen(port, function(){
+    console.log("server is running on port", port);
 })

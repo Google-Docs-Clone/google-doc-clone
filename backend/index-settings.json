@@ -12,7 +12,11 @@
               "tokenizer": "whitespace"
             }
           }
-        }
+        },
+      "index": {
+        "highlight.max_analyzed_offset": "10000000",
+        "refresh_interval": "20s"
+      }
     },
     "mappings": {
       "properties": {

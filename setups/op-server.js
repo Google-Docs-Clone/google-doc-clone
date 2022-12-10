@@ -66,14 +66,17 @@ const Y = require('yjs')
 const { Client } = require('@elastic/elasticsearch');
 
 var client = new Client({
-    node: 'https://209.151.152.235:9200',
+    node: 'https://209.151.155.155:9200',
     auth: {
         username: 'elastic',
-        password: "W063lUQqlIeVFeaR1SOc"
+        password: "6KPmCS=hL*Pnyc-hcJ1y"
+    },
+    tls: {
+        ca: fs.readFileSync('/root/google-doc-clone/http_ca.crt'),
+        rejectUnauthorized: false
     }
-  });
+});
 
-var existWords = {}
 var docData = {}
 
 app.get('/api/connect/:id', auth, (req, res) => {
@@ -93,7 +96,6 @@ app.get('/api/connect/:id', auth, (req, res) => {
 			length: null
 		}
 	}
-
     if (docData.hasOwnProperty(id)){
 		let newDoc = Array.from(Y.encodeStateAsUpdate(docData[id].doc))
 		
@@ -152,47 +154,74 @@ app.post('/api/op/:id', auth, (req, res) => {
 })
 
 updateQueue = async () => {
-  for (const id in docData){
-      if (docData.hasOwnProperty(id)) {
-          if (docData[id].queue === true){
-              docData[id].queue = false;
-              let json = docData[id].doc.getText('quill').toJSON()
-              await client.index({
-                  index: 'yjs',
-                  id: id,
-                  refresh: true,
-                  document: {
-                      name: docData[id].name,
-                      content: json
-                  }
-              })
-              bulkUpdate(json, id)
-          }
-      }
-  }
+    let bulk = []
+    for (const id in docData){
+        if (docData.hasOwnProperty(id)) {
+            if (docData[id].queue === true){
+                docData[id].queue = false;
+                let json = docData[id].doc.getText('quill').toJSON()
+                bulk.push({
+                    update: {
+                        _id: id,
+                        _index: 'yjs'
+                    }
+                })
+                bulk.push({
+                    doc: {
+                        content: json
+                    }
+                })
+
+                let words = json.match(/\b(\w+)\b/g)
+                if(words){
+                    words = words.map(word => word.toLowerCase())
+                    words = [...new Set(words)];
+                    words = words.filter(word => word.length > 6)
+                    bulk.push({
+                        update: {
+                            _id: id,
+                            _index: 'yjs-suggest'
+                        }
+                    })
+                    bulk.push({
+                        doc: {
+                            suggest: words
+                        }
+                    })
+                }
+            }
+        }
+    }
+    if (bulk.length !== 0){
+        client.bulk({ body: bulk });
+    }
 }
 
-bulkUpdate = async (json) => {
+bulkUpdate = (json, id) => {
     let words = json.match(/\b(\w+)\b/g)
     if(words){
         words = words.map(word => word.toLowerCase())
         words = [...new Set(words)];
         words = words.filter(word => word.length > 6)
-        client.index({
-            index: 'yjs-suggest',
-            id: id,
-            document: {
-                suggest: words
-            }
-        })
+        return words
+        // console.log('suggest:', id)
+        // client.index({
+        //     index: 'yjs-suggest',
+        //     id: id,
+        //     document: {
+        //         suggest: words
+        //     }
+        // })
     }
+    return []
 }
 
-setInterval(updateQueue, 5000);
-
+setInterval(updateQueue, 20000);
 
 var server = http.createServer(app);
 
-server.listen(3000, function(){
-    console.log("server is running on port 3000");
+let port = 3000
+
+server.listen(port, function(){
+    console.log("server is running on port", port);
 })

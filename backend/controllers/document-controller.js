@@ -6,15 +6,15 @@ const { Client } = require('@elastic/elasticsearch');
 const axios = require('axios');
 
 var client = new Client({
-    node: 'https://209.151.152.235:9200',
+    node: 'https://209.151.155.155:9200',
     auth: {
         username: 'elastic',
-        password: "W063lUQqlIeVFeaR1SOc"
+        password: "6KPmCS=hL*Pnyc-hcJ1y"
     },
     tls: {
         ca: fs.readFileSync('/root/google-doc-clone/http_ca.crt'),
         rejectUnauthorized: false
-      }
+    }
   });
 
 var existWords = {}
@@ -66,13 +66,20 @@ createDocument = async (req, res) => {
         id: savedDocument._id
     })
 
-    await client.index({
+    client.index({
         index: 'yjs',
         id: savedDocument._id.toString(),
-        refresh: true,
         document: {
             name: savedDocument.name,
             content: ""
+        }
+    }).catch(console.log)
+
+    client.index({
+        index: 'yjs-suggest',
+        id: savedDocument._id.toString(),
+        document: {
+            suggest: []
         }
     }).catch(console.log)
 }
