@@ -4,7 +4,7 @@ import axios from 'axios'
 export default function GetDocument() {
 
     const api = axios.create({
-        baseURL: 'http://nix.cse356.compas.cs.stonybrook.edu',
+        baseURL: 'http://krg.cse356.compas.cs.stonybrook.edu',
     })
 
     const [res, setRes] = useState('')

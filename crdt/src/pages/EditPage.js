@@ -18,7 +18,7 @@ export default function EditPage() {
 
 	const wrapperRef = useCallback((wrapper) => {
 		const api = axios.create({
-			baseURL: 'http://nix.cse356.compas.cs.stonybrook.edu/api',
+			baseURL: 'http://krg.cse356.compas.cs.stonybrook.edu/api',
 			withCredentials: true 
 		})
 
@@ -53,7 +53,7 @@ export default function EditPage() {
 		
 		const binding = new QuillBinding(ytext, editor)
 		
-		var eventSource = new EventSource(`http://nix.cse356.compas.cs.stonybrook.edu/api/connect/${id}`, { withCredentials: true })
+		var eventSource = new EventSource(`http://krg.cse356.compas.cs.stonybrook.edu/api/connect/${id}`, { withCredentials: true })
 		console.log(eventSource)
 
 		eventSource.addEventListener('sync', (e) => {

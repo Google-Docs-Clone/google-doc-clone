@@ -9,14 +9,14 @@ export default function Home() {
 
     useEffect(()=> {
         const api = axios.create({
-            baseURL: 'http://nix.cse356.compas.cs.stonybrook.edu',
+            baseURL: 'http://krg.cse356.compas.cs.stonybrook.edu',
             withCredentials: true 
         })
     
         api.get('/collection/list').then(response => {
             console.log(response.data)
             const list = response.data.map((d) => {
-                let editLink = 'http://nix.cse356.compas.cs.stonybrook.edu/edit/' + d.id;
+                let editLink = 'http://krg.cse356.compas.cs.stonybrook.edu/edit/' + d.id;
                 return <div key={d.id} >
                     <a href={editLink} >{d.id}</a>  name: {d.name} 
                     <form action="/collection/delete" method="post">

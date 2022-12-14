@@ -4,12 +4,13 @@ const fs = require("fs");
 const Y = require('yjs')
 const { Client } = require('@elastic/elasticsearch');
 const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
 
 var client = new Client({
-    node: 'https://209.151.155.155:9200',
+    node: 'https://209.151.152.71:9200',
     auth: {
         username: 'elastic',
-        password: "6KPmCS=hL*Pnyc-hcJ1y"
+        password: "1idqXQYv97NwAFwO+08T"
     },
     tls: {
         ca: fs.readFileSync('/root/google-doc-clone/http_ca.crt'),
@@ -48,36 +49,26 @@ createDocument = async (req, res) => {
 
     if (!name){ return handleError(res, 'invalid name') }
 
-    const newDocument = new Document({
-        name: name,
-        yjs: [0,0]
-    })
-    const savedDocument = await newDocument.save()
-    docData[savedDocument._id] = {
-        clients: [],
-        doc: new Y.Doc(),
-        queue: [],
-        name: name
-    }
+    let id = uuidv4()
 
     res
     .status(200)
     .json({
-        id: savedDocument._id
+        id: id
     })
 
     client.index({
         index: 'yjs',
-        id: savedDocument._id.toString(),
+        id: id,
         document: {
-            name: savedDocument.name,
+            name: name,
             content: ""
         }
     }).catch(console.log)
 
     client.index({
         index: 'yjs-suggest',
-        id: savedDocument._id.toString(),
+        id: id,
         document: {
             suggest: []
         }
