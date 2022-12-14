@@ -48,11 +48,10 @@ app.get('/index/search', async (req, res) => {
                     },
                     highlight: {
                         order: "score",
+                        fragment_size: 30,
+                        number_of_fragments: 3,
                         fields: {
-                            content: {
-                                fragment_size: 30,
-                                number_of_fragments: 3
-                            }
+                            content: {    }
                         }
                     }
                 }).then(result => {
@@ -67,7 +66,7 @@ app.get('/index/search', async (req, res) => {
                     }
                     
                     res.status(200).json(response)
-                    memcached.set(query, response, 0.5, function (err) {  });
+                    memcached.set(query, response, 10, function (err) {  });
                 })
                 
             } catch (error) {
@@ -78,66 +77,36 @@ app.get('/index/search', async (req, res) => {
 })
 
 app.get('/index/suggest', async (req, res) => {
-    try {
-        let query = req.query.q
-
-        const result = await client.search({
-            index: "yjs-suggest",
-            _source: false,
-            suggest: {
-                autocomplete: {
-                    prefix: query,
-                    completion: {
-                        field: "suggest",
-                        skip_duplicates: true
+    let query = req.query.q
+    memcached.get(query, (err, data) =>{
+        try {
+            const result = await client.search({
+                index: "yjs-suggest",
+                _source: false,
+                suggest: {
+                    autocomplete: {
+                        prefix: query,
+                        completion: {
+                            field: "suggest",
+                            skip_duplicates: true
+                        }
                     }
                 }
+            })
+            
+            let response = []
+    
+            let options = result.suggest.autocomplete[0].options
+    
+            for (let i=0; i<options.length; i++){
+                response.push(options[i]["text"])
             }
-        })
-        
-        let response = []
-
-        let options = result.suggest.autocomplete[0].options
-
-        for (let i=0; i<options.length; i++){
-            response.push(options[i]["text"])
+            res.status(200).json(response)
+            memcached.set(query, response, 10, function (err) {  });
+        } catch (error) {
+            console.log(error)
         }
-
-        // without a new index
-        // const result = await client.search({
-        //     "_source": false,
-        //     "query": {
-        //         "match_phrase_prefix": {
-        //             "content": query
-        //         }
-        //     },
-        //     "highlight": {
-        //         "order": "score",
-        //         "boundary_scanner": "word",
-        //         "pre_tags": [""],
-        //         "post_tags": [""], 
-        //         "fields": {
-        //           "content": {}
-        //         }
-        //     }
-        // })
-        
-        // let response = []
-
-        // let hits = result.hits.hits
-
-        // for (let i=0; i<hits.length; i++){
-        //     let word = hits[i]["highlight"]['content'][0]
-        //     if (!response.includes(word)){
-        //         response.push(word)
-        //     }
-        // }
-
-        res.status(200).json(response)
-    } catch (error) {
-        console.log(error)
-    }
-
+    })
 })
 
 

@@ -87,6 +87,15 @@ app.get('/api/connect/:id', auth, (req, res) => {
     res.flushHeaders();
     
     let id = req.params.id;
+
+    if (!docData.hasOwnProperty(id)){
+        docData[doc._id] = {
+            clients: [],
+            doc: new Y.Doc(),
+            queue: []
+        }
+    }
+
 	const newClient = {
 		res: res,
 		id: req.session.user,
@@ -96,37 +105,22 @@ app.get('/api/connect/:id', auth, (req, res) => {
 			length: null
 		}
 	}
-    if (docData.hasOwnProperty(id)){
-		let newDoc = Array.from(Y.encodeStateAsUpdate(docData[id].doc))
-		
-		res.write(`id:${id}\ndata:${JSON.stringify({update: newDoc})}\nevent:sync\n\n`);
-		docData[id].clients.push(newClient)
-		docData[id].clients.forEach(client => {
-			res.write(`id:${id}\ndata:${JSON.stringify({session_id: req.session.token, name: req.session.name, cursor: {index: client.cursor.index, length: client.cursor.length}, id: client.name})}\nevent:presence\n\n`);
-		})
-    }else {
-        Document.findById(id, (err, doc) => {
-            if (err || doc === null) return res.end()
-            docData[doc._id] = {
-                clients: [],
-                doc: new Y.Doc(),
-                queue: false,
-                name: doc.name
-            }
-            Y.applyUpdate(docData[doc._id].doc, new Uint8Array(doc.yjs))
-            res.write(`id:${id}\ndata:${JSON.stringify({update: doc.yjs})}\nevent:sync\n\n`);
-            docData[id].clients.push(newClient)
-            docData[id].clients.forEach(client => {
-                res.write(`id:${id}\ndata:${JSON.stringify({session_id: req.session.token, name: req.session.name, cursor: {index: client.cursor.index, length: client.cursor.length, id: client.name}})}\nevent:presence\n\n`);
-            })
-            docData[doc._id].doc.on('update', (update) => {
-				update = Array.from(update)
-				docData[doc._id].clients.forEach(client => {
-					client.res.write(`id:${doc._id}\ndata:${JSON.stringify({update: update})}\nevent:update\n\n`)
-				});
-			})
-        })
-    }
+
+    let newDoc = Array.from(Y.encodeStateAsUpdate(docData[id].doc))
+
+    res.write(`id:${id}\ndata:${JSON.stringify({update: newDoc})}\nevent:sync\n\n`);
+    docData[id].clients.push(newClient)
+    docData[id].clients.forEach(client => {
+        res.write(`id:${id}\ndata:${JSON.stringify({session_id: req.session.token, name: req.session.name, cursor: {index: client.cursor.index, length: client.cursor.length}, id: client.name})}\nevent:presence\n\n`);
+    })
+
+    docData[doc._id].doc.on('update', (update) => {
+        update = Array.from(update)
+        docData[doc._id].clients.forEach(client => {
+            client.res.write(`id:${doc._id}\ndata:${JSON.stringify({update: update})}\nevent:update\n\n`)
+        });
+    })
+
     req.on('close', () => {
         if (docData[id] && docData[id].clients){
             docData[id].clients = docData[id].clients.filter(client => client.id !== req.session.id);
@@ -146,19 +140,23 @@ app.post('/api/op/:id', auth, (req, res) => {
 	let docId = req.params.id;
 	const {update} = req.body;
 
+    docData[docId].queue.push(new Uint8Array(update))
+
 	res.json({
 		status: 200
 	})
-	Y.applyUpdate(docData[docId].doc, new Uint8Array(update))
-	docData[docId].queue = true;
 })
 
 updateQueue = async () => {
     let bulk = []
     for (const id in docData){
         if (docData.hasOwnProperty(id)) {
-            if (docData[id].queue === true){
-                docData[id].queue = false;
+            if (docData[id].queue.length > 0){
+
+                let update = Y.mergeUpdate(docData[id].queue)
+                Y.applyUpdate(docData[id].doc, update)
+                docData[id].queue = []
+
                 let json = docData[id].doc.getText('quill').toJSON()
                 bulk.push({
                     update: {
@@ -195,25 +193,6 @@ updateQueue = async () => {
     if (bulk.length !== 0){
         client.bulk({ body: bulk });
     }
-}
-
-bulkUpdate = (json, id) => {
-    let words = json.match(/\b(\w+)\b/g)
-    if(words){
-        words = words.map(word => word.toLowerCase())
-        words = [...new Set(words)];
-        words = words.filter(word => word.length > 6)
-        return words
-        // console.log('suggest:', id)
-        // client.index({
-        //     index: 'yjs-suggest',
-        //     id: id,
-        //     document: {
-        //         suggest: words
-        //     }
-        // })
-    }
-    return []
 }
 
 setInterval(updateQueue, 20000);
